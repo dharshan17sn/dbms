@@ -47,7 +47,8 @@ Built with **Bun + TypeScript + Express + Prisma + PostgreSQL**.
    git clone https://github.com/<your-username>/<repo>.git
    cd backend
    ```
-   2️⃣ Install Dependencies
+
+2️⃣ Install Dependencies
 
 Using Bun (recommended):
 
