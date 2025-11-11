@@ -1,0 +1,755 @@
+openapi: 3.0.3
+info:
+  title: College Projects Backend API
+  version: "1.0.0"
+  description: |
+    API for the college projects web app. Sections:
+    - Project openings & team management
+    - Experimental project uploads & mentor verification
+    - Placement job posts & auto-apply
+
+servers:
+  - url: http://localhost:4000
+    description: Local dev server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+
+    AuthSignup:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        displayName:
+          type: string
+
+    AuthLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthToken:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          example: 3600
+
+    UserPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [STUDENT, MENTOR, PLACEMENT_ADMIN, ADMIN]
+
+    Profile:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        tenthPercent:
+          type: number
+        twelfthPercent:
+          type: number
+        cgpa:
+          type: number
+        resumeLink:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        allowAutoApply:
+          type: boolean
+
+    ProjectCreate:
+      type: object
+      required: [title, type]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [IDEA, EXPERIMENTAL, STARTUP_DISCUSSION]
+        visibility:
+          type: string
+          enum: [PUBLIC, COLLEGE_ONLY, PRIVATE]
+        tags:
+          type: array
+          items:
+            type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        ownerId:
+          type: string
+        type:
+          type: string
+        visibility:
+          type: string
+        status:
+          type: string
+        trustScore:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    JoinRequestCreate:
+      type: object
+      required: []
+      properties:
+        message:
+          type: string
+
+    JoinRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+        requesterId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, REJECTED, CANCELLED]
+        createdAt:
+          type: string
+          format: date-time
+
+    ProjectFile:
+      type: object
+      properties:
+        id:
+          type: string
+        fileType:
+          type: string
+          enum: [GIT, VIDEO, IMAGE, DOC, OTHER]
+        url:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+
+    VerificationRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+        notes:
+          type: string
+
+    Verification:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        status:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        scheduledAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    PresentationSchedule:
+      type: object
+      properties:
+        mentorId:
+          type: string
+        scheduledAt:
+          type: string
+          format: date-time
+        meetingLink:
+          type: string
+        location:
+          type: string
+
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        website:
+          type: string
+
+    JobPostCreate:
+      type: object
+      required: [companyId, title]
+      properties:
+        companyId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        jdLink:
+          type: string
+        minCgpa:
+          type: number
+        requiresVerifiedProject:
+          type: boolean
+
+    JobPost:
+      type: object
+      properties:
+        id:
+          type: string
+        companyId:
+          type: string
+        title:
+          type: string
+        postedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+
+    JobApplicationCreate:
+      type: object
+      properties:
+        appliedVia:
+          type: string
+          enum: [MANUAL, AUTO]
+
+  parameters:
+    ProjectIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Project ID (UUID)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/auth/signup:
+    post:
+      summary: Create account (student/mentor/admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthSignup"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthToken"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/auth/login:
+    post:
+      summary: Login (returns JWT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthLogin"
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthToken"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/users/me:
+    get:
+      summary: Get current user's public profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPublic"
+        "401":
+          description: Unauthorized
+    put:
+      summary: Update profile (Profile object)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Profile"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: Invalid input
+
+  /api/projects:
+    post:
+      summary: Create a project (idea / experimental / startup)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          description: Unauthorized
+    get:
+      summary: List projects (filter via query)
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [IDEA, EXPERIMENTAL, STARTUP_DISCUSSION]
+        - in: query
+          name: ownerId
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Projects list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
+  /api/projects/{id}:
+    get:
+      summary: Get project by id
+      parameters:
+        - $ref: "#/components/parameters/ProjectIdParam"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+    put:
+      summary: Update project (owner or admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectIdParam"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /api/projects/{id}/join-requests:
+    post:
+      summary: Send join request to project
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectIdParam"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRequestCreate"
+      responses:
+        "201":
+          description: Request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinRequest"
+        "400":
+          description: Bad request
+    get:
+      summary: List pending join requests (owner/maintainer)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectIdParam"
+      responses:
+        "200":
+          description: list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JoinRequest"
+
+  /api/projects/{id}/members:
+    get:
+      summary: List project members & roles
+      parameters:
+        - $ref: "#/components/parameters/ProjectIdParam"
+      responses:
+        "200":
+          description: members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    user:
+                      $ref: "#/components/schemas/UserPublic"
+                    role:
+                      type: string
+
+  /api/projects/{id}/files:
+    post:
+      summary: Add file/link to project (git link, video, image)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileType:
+                  type: string
+                  enum: [GIT, VIDEO, IMAGE, DOC, OTHER]
+                url:
+                  type: string
+                caption:
+                  type: string
+      responses:
+        "201":
+          description: File added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectFile"
+
+  /api/verifications:
+    post:
+      summary: Request verification for a project (student)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerificationRequest"
+      responses:
+        "201":
+          description: Verification requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Verification"
+
+  /api/verifications/{id}/schedule:
+    post:
+      summary: Mentor schedules presentation for verification
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresentationSchedule"
+      responses:
+        "200":
+          description: scheduled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Verification"
+
+  /api/verifications/{id}/verify:
+    post:
+      summary: Mentor marks verification as verified/rejected
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [VERIFIED, REJECTED]
+                notes:
+                  type: string
+      responses:
+        "200":
+          description: updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Verification"
+
+  /api/companies:
+    post:
+      summary: Create company (placement admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Company"
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+
+    get:
+      summary: List companies
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Company"
+
+  /api/jobs:
+    post:
+      summary: Create a job post (placement admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobPostCreate"
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobPost"
+    get:
+      summary: List job posts (filters supported)
+      parameters:
+        - name: minCgpa
+          in: query
+          schema:
+            type: number
+        - name: requiresVerifiedProject
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobPost"
+
+  /api/jobs/{id}/apply:
+    post:
+      summary: Apply to job (manual or auto)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JobApplicationCreate"
+      responses:
+        "201":
+          description: applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+
+  /api/auto-apply/check:
+    post:
+      summary: Trigger auto-apply check for the current user (debugging / manual)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applied:
+                    type: integer
+                  notified:
+                    type: integer
+
+  /api/notifications:
+    get:
+      summary: Get current user's notifications
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    type:
+                      type: string
+                    payload:
+                      type: object
+                    read:
+                      type: boolean
+                    createdAt:
+                      type: string
+                      format: date-time
+
+tags:
+  - name: auth
+    description: Authentication endpoints
+  - name: users
+    description: User profile endpoints
+  - name: projects
+    description: Project creation, join requests, file uploads
+  - name: mentor
+    description: Mentor verification & presentation scheduling
+  - name: placement
+    description: Companies and job postings, applications

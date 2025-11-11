@@ -1,0 +1,27 @@
+# Root .gitignore
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Node.js
+node_modules/
+npm-debug.log*
+bun.lockb
+dist/
+build/
+coverage/
+
+# Environment files
+.env
+.env.*
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+
+# OS-generated
+*.log
+
+# Prisma
+prisma/migrations/*-shadow-database*

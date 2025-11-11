@@ -1,0 +1,309 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  MENTOR
+  PLACEMENT_ADMIN
+  ADMIN
+}
+
+enum ProjectType {
+  IDEA
+  EXPERIMENTAL
+  STARTUP_DISCUSSION
+}
+
+enum Visibility {
+  PUBLIC
+  COLLEGE_ONLY
+  PRIVATE
+}
+
+enum ProjectStatus {
+  OPEN
+  FORMING
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum JoinRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum FileType {
+  GIT
+  VIDEO
+  IMAGE
+  DOC
+  OTHER
+}
+
+enum VerificationStatus {
+  REQUESTED
+  SCHEDULED
+  VERIFIED
+  REJECTED
+}
+
+enum AppliedVia {
+  MANUAL
+  AUTO
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id                     String            @id @default(uuid()) @db.Uuid
+  email                  String            @unique
+  passwordHash           String
+  displayName            String
+  role                   UserRole          @default(STUDENT)
+  createdAt              DateTime          @default(now())
+  lastSeen               DateTime?
+  profile                Profile?
+  ownedProjects          Project[]         @relation("ProjectOwner")
+  projectMembers         ProjectMember[]
+  joinRequests           JoinRequest[]     @relation("Requester")
+  processedJoinRequests  JoinRequest[]     @relation("Processor")
+  uploadedFiles          ProjectFile[]     @relation("Uploader")
+  verificationsRequested Verification[]    @relation("VerificationRequester")
+  verificationsAssigned  Verification[]    @relation("VerificationMentor")
+  presentations          MentorshipPresentation[] @relation("MentorPresentation")
+  createdCompanies       Company[]         @relation("CompanyCreator")
+  jobApplications        JobApplication[]
+  autoApplyRule          AutoApplyRule?
+  notifications          Notification[]
+  tasksAssigned          Task[]            @relation("TaskAssignee")
+  activityLogs           ActivityLog[]
+}
+
+model Profile {
+  userId         String   @id @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenthPercent   Decimal? @db.Decimal(5, 2)
+  twelfthPercent Decimal? @db.Decimal(5, 2)
+  cgpa           Decimal? @db.Decimal(4, 2)
+  resumeLink     String?
+  skills         String[] // Postgres array
+  bio            String?
+  allowAutoApply Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model Project {
+  id           String           @id @default(uuid()) @db.Uuid
+  title        String
+  description  String?
+  ownerId      String           @db.Uuid
+  owner        User             @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  type         ProjectType
+  visibility   Visibility       @default(COLLEGE_ONLY)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  status       ProjectStatus    @default(OPEN)
+  trustScore   Int              @default(0)
+  members      ProjectMember[]
+  joinRequests JoinRequest[]
+  files        ProjectFile[]
+  verifications Verification[]
+  tasks        Task[]
+  activityLogs ActivityLog[]
+}
+
+model Role {
+  id      Int             @id @default(autoincrement())
+  name    String          @unique
+  members ProjectMember[]
+}
+
+model ProjectMember {
+  projectId String   @db.Uuid
+  userId    String   @db.Uuid
+  roleId    Int?
+  isOwner   Boolean  @default(false)
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role?   @relation(fields: [roleId], references: [id])
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model JoinRequest {
+  id          String          @id @default(uuid()) @db.Uuid
+  projectId   String          @db.Uuid
+  requesterId String          @db.Uuid
+  message     String?
+  status      JoinRequestStatus @default(PENDING)
+  createdAt   DateTime        @default(now())
+  processedBy String?         @db.Uuid
+  processedAt DateTime?
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requester User    @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  processor User?   @relation("Processor", fields: [processedBy], references: [id])
+}
+
+model ProjectFile {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @db.Uuid
+  fileType   FileType
+  url        String
+  caption    String?
+  uploadedBy String?  @db.Uuid
+  uploadedAt DateTime @default(now())
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader User?   @relation("Uploader", fields: [uploadedBy], references: [id])
+}
+
+model Verification {
+  id           String             @id @default(uuid()) @db.Uuid
+  projectId    String             @db.Uuid
+  requestedBy  String             @db.Uuid
+  mentorId     String?            @db.Uuid
+  status       VerificationStatus @default(REQUESTED)
+  requestedAt  DateTime           @default(now())
+  scheduledAt  DateTime?
+  verifiedAt   DateTime?
+  notes        String?
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requester    User          @relation("VerificationRequester", fields: [requestedBy], references: [id], onDelete: Cascade)
+  mentor       User?         @relation("VerificationMentor", fields: [mentorId], references: [id])
+  presentations MentorshipPresentation[]
+}
+
+model MentorshipPresentation {
+  id             String   @id @default(uuid()) @db.Uuid
+  verificationId String   @db.Uuid
+  mentorId       String?  @db.Uuid
+  scheduledAt    DateTime
+  location       String?
+  meetingLink    String?
+  createdAt      DateTime @default(now())
+
+  verification Verification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  mentor       User?        @relation("MentorPresentation", fields: [mentorId], references: [id])
+}
+
+model Company {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  website    String?
+  createdBy  String?  @db.Uuid
+  createdAt  DateTime @default(now())
+
+  creator User?    @relation("CompanyCreator", fields: [createdBy], references: [id])
+  jobPosts JobPost[]
+}
+
+model JobPost {
+  id                      String      @id @default(uuid()) @db.Uuid
+  companyId               String?     @db.Uuid
+  title                   String
+  description             String?
+  jdLink                  String?
+  minCgpa                 Decimal?    @db.Decimal(4, 2)
+  requiresVerifiedProject Boolean     @default(false)
+  postedAt                DateTime    @default(now())
+  expiresAt               DateTime?
+
+  company      Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  applications JobApplication[]
+
+  @@index([postedAt])
+}
+
+model JobApplication {
+  id          String         @id @default(uuid()) @db.Uuid
+  jobPostId   String         @db.Uuid
+  applicantId String         @db.Uuid
+  appliedAt   DateTime       @default(now())
+  appliedVia  AppliedVia     @default(MANUAL)
+  status      ApplicationStatus @default(APPLIED)
+
+  jobPost   JobPost @relation(fields: [jobPostId], references: [id], onDelete: Cascade)
+  applicant User    @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@unique([jobPostId, applicantId])
+  @@index([applicantId])
+}
+
+model AutoApplyRule {
+  userId                String   @id @db.Uuid
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minCgpa               Decimal? @db.Decimal(4, 2)
+  requireVerifiedProject Boolean @default(false)
+  skills                String[]
+  lastCheckedAt         DateTime?
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  type      String
+  payload   Json
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
+
+model Task {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @db.Uuid
+  title      String
+  description String?
+  assigneeId String?  @db.Uuid
+  status     TaskStatus @default(TODO)
+  priority   Int      @default(2)
+  createdAt  DateTime @default(now())
+  dueDate    DateTime?
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String?  @db.Uuid
+  userId     String?  @db.Uuid
+  action     String
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([userId])
+}
