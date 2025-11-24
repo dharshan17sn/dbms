@@ -1,7 +1,28 @@
 import { Router } from "express";
 import prisma from "../db/prismaClient";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const router = Router();
+
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+        cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
+    },
+});
+
+const upload = multer({ storage });
 
 // Get Dashboard Stats
 router.get("/stats", async (req, res) => {
@@ -60,7 +81,7 @@ router.get("/profile", async (req, res) => {
 });
 
 // Update Profile
-router.put("/profile", async (req, res) => {
+router.put("/profile", upload.single("resume"), async (req, res) => {
     // @ts-ignore
     const userId = req.user?.userId;
     if (!userId) {
@@ -69,16 +90,48 @@ router.put("/profile", async (req, res) => {
     }
 
     try {
-        const { bio, skills, resumeLink, cgpa, researchPapers } = req.body;
+        const { bio, skills, cgpa, researchPapers, gitLink, usn, branch, gender, phone, currentYear } = req.body;
+        let resumeLink = req.body.resumeLink;
+
+        // @ts-ignore
+        if (req.file) {
+            // @ts-ignore
+            resumeLink = `/uploads/${req.file.filename}`;
+        }
+
+        // Parse skills and researchPapers if they are strings (from FormData)
+        let parsedSkills = skills;
+        if (typeof skills === "string") {
+            try {
+                parsedSkills = JSON.parse(skills);
+            } catch (e) {
+                parsedSkills = skills.split(",").map((s: string) => s.trim());
+            }
+        }
+
+        let parsedResearchPapers = researchPapers;
+        if (typeof researchPapers === "string") {
+            try {
+                parsedResearchPapers = JSON.parse(researchPapers);
+            } catch (e) {
+                parsedResearchPapers = [researchPapers];
+            }
+        }
 
         const updatedProfile = await prisma.profile.update({
             where: { userId },
             data: {
                 bio,
-                skills,
+                skills: parsedSkills,
                 resumeLink,
-                cgpa,
-                researchPapers,
+                gitLink,
+                usn,
+                branch,
+                gender,
+                phone,
+                currentYear,
+                cgpa: cgpa ? parseFloat(cgpa) : undefined,
+                researchPapers: parsedResearchPapers,
             },
         });
 

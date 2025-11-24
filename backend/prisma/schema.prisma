@@ -117,6 +117,12 @@ model Profile {
   twelfthPercent Decimal? @db.Decimal(5, 2)
   cgpa           Decimal? @db.Decimal(4, 2)
   resumeLink     String?
+  gitLink        String?
+  usn            String?
+  branch         String?
+  gender         String?
+  phone          String?
+  currentYear    String?
   skills         String[] // Postgres array
   bio            String?
   researchPapers String[] @default([]) // For mentors

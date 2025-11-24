@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import { authenticateToken } from "./middlewares/auth.middleware";
+import path from "path";
 
 import docsRoutes from "./routes/docs.routes";
 import projectsRoutes from "./routes/projects.routes";
@@ -19,6 +20,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(morgan("tiny"));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // health
 app.get("/", (_req, res) => res.json({ ok: true, message: "Backend running ✅" }));
