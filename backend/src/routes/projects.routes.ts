@@ -36,10 +36,14 @@ router.get("/", async (req, res) => {
           where: { userId },
           select: { userId: true, isOwner: true }
         },
-        joinRequests: {
-          where: { requesterId: userId, status: "PENDING" },
-          select: { id: true, status: true }
-        }
+        ...(userId
+          ? {
+            joinRequests: {
+              where: { requesterId: userId, status: "PENDING" },
+              select: { id: true, status: true }
+            }
+          }
+          : {})
       },
       orderBy: { createdAt: "desc" }
     });
@@ -60,7 +64,19 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    const { title, description, type, visibility, videoUrl, imageUrl, gitUrl, teamOpenings, status, isTeam, roleRequirements } = req.body;
+    const {
+      title,
+      description,
+      type,
+      visibility,
+      videoUrl,
+      imageUrl,
+      gitUrl,
+      teamOpenings,
+      status,
+      isTeam,
+      roleRequirements
+    } = req.body;
 
     if (!title || !type) {
       res.status(400).json({ error: "Missing title or type" });
@@ -80,7 +96,7 @@ router.post("/", async (req, res) => {
         isTeam: isTeam || false,
         teamOpenings: teamOpenings || 0,
         status: status || "OPEN"
-      },
+      }
     });
 
     // If creating as team, add owner as first member and create role requirements
@@ -121,7 +137,9 @@ router.get("/:id", async (req, res) => {
     const project = await prisma.project.findUnique({
       where: { id },
       include: {
-        owner: { select: { id: true, displayName: true, email: true, role: true } },
+        owner: {
+          select: { id: true, displayName: true, email: true, role: true }
+        },
         members: {
           include: {
             user: { select: { id: true, displayName: true } },
@@ -140,7 +158,7 @@ router.get("/:id", async (req, res) => {
           },
           orderBy: { createdAt: "desc" }
         }
-      },
+      }
     });
 
     if (!project) {
@@ -179,7 +197,9 @@ router.delete("/:id", async (req, res) => {
     }
 
     if (project.ownerId !== userId) {
-      res.status(403).json({ error: "You can only delete your own projects" });
+      res
+        .status(403)
+        .json({ error: "You can only delete your own projects" });
       return;
     }
 
@@ -309,6 +329,97 @@ router.get("/:id/upvotes", async (req, res) => {
   }
 });
 
+// Add member directly (owner only)
+router.post("/:id/members", async (req, res) => {
+  // @ts-ignore
+  const userId = req.user?.userId;
+  const { id } = req.params;
+  const { userId: memberUserId, roleId } = req.body;
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    // Verify project ownership
+    const project = await prisma.project.findUnique({
+      where: { id },
+      select: { ownerId: true, isTeam: true }
+    });
+
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+
+    if (project.ownerId !== userId) {
+      res.status(403).json({ error: "Only project owner can add members" });
+      return;
+    }
+
+    if (!project.isTeam) {
+      res.status(400).json({ error: "This is not a team project" });
+      return;
+    }
+
+    // Check if user is already a member
+    const existingMember = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: id,
+          userId: memberUserId
+        }
+      }
+    });
+
+    if (existingMember) {
+      res.status(400).json({ error: "User is already a member of this team" });
+      return;
+    }
+
+    // Add member
+    await prisma.projectMember.create({
+      data: {
+        projectId: id,
+        userId: memberUserId,
+        roleId: roleId || null
+      }
+    });
+
+    // Decrement role requirement count if roleId provided
+    if (roleId) {
+      const roleReq = await prisma.teamRoleRequirement.findUnique({
+        where: {
+          projectId_roleId: {
+            projectId: id,
+            roleId: roleId
+          }
+        }
+      });
+
+      if (roleReq && roleReq.count > 0) {
+        await prisma.teamRoleRequirement.update({
+          where: {
+            projectId_roleId: {
+              projectId: id,
+              roleId: roleId
+            }
+          },
+          data: {
+            count: roleReq.count - 1
+          }
+        });
+      }
+    }
+
+    res.status(201).json({ message: "Member added successfully" });
+  } catch (error) {
+    console.error("Add member error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Request to join team with specific role
 router.post("/:id/join", async (req, res) => {
   // @ts-ignore
@@ -333,7 +444,9 @@ router.post("/:id/join", async (req, res) => {
     });
 
     if (existingMember) {
-      res.status(400).json({ error: "You are already a member of this team" });
+      res
+        .status(400)
+        .json({ error: "You are already a member of this team" });
       return;
     }
 
@@ -416,7 +529,9 @@ router.post("/:id/join-requests/:requestId/accept", async (req, res) => {
     });
 
     if (!project || project.ownerId !== userId) {
-      res.status(403).json({ error: "Only project owner can accept requests" });
+      res
+        .status(403)
+        .json({ error: "Only project owner can accept requests" });
       return;
     }
 
@@ -529,7 +644,9 @@ router.post("/:id/join-requests/:requestId/reject", async (req, res) => {
     });
 
     if (!project || project.ownerId !== userId) {
-      res.status(403).json({ error: "Only project owner can reject requests" });
+      res
+        .status(403)
+        .json({ error: "Only project owner can reject requests" });
       return;
     }
 
@@ -546,6 +663,82 @@ router.post("/:id/join-requests/:requestId/reject", async (req, res) => {
     res.json({ message: "Request rejected" });
   } catch (error) {
     console.error("Reject request error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Add member to project (owner only)
+router.post("/:id/members", async (req, res) => {
+  // @ts-ignore
+  const userId = req.user?.userId;
+  const { id } = req.params;
+  const { userId: memberUserId, roleId } = req.body;
+
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    // Verify ownership
+    const project = await prisma.project.findUnique({
+      where: { id },
+      select: { ownerId: true, isTeam: true }
+    });
+
+    if (!project || project.ownerId !== userId) {
+      res.status(403).json({ error: "Only project owner can add members" });
+      return;
+    }
+
+    if (!project.isTeam) {
+      res
+        .status(400)
+        .json({ error: "Can only add members to team projects" });
+      return;
+    }
+
+    // Check if already a member
+    const existingMember = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: id,
+          userId: memberUserId
+        }
+      }
+    });
+
+    if (existingMember) {
+      res.status(400).json({ error: "User is already a member" });
+      return;
+    }
+
+    // Add member and decrement role requirement in a transaction
+    await prisma.$transaction([
+      prisma.projectMember.create({
+        data: {
+          projectId: id,
+          userId: memberUserId,
+          isOwner: false,
+          roleId: roleId
+        }
+      }),
+      prisma.teamRoleRequirement.updateMany({
+        where: {
+          projectId: id,
+          roleId: roleId,
+          count: { gt: 0 }
+        },
+        data: {
+          count: { decrement: 1 }
+        }
+      })
+    ]);
+
+    // NO NOTIFICATION - Direct addition as requested
+    res.status(201).json({ message: "Member added successfully" });
+  } catch (error) {
+    console.error("Add member error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });

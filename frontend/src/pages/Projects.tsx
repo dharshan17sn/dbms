@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2, ThumbsUp, MessageCircle, UserPlus, Users, X, Search, Send } from "lucide-react";
+import {
+    Plus,
+    Trash2,
+    ThumbsUp,
+    MessageCircle,
+    UserPlus,
+    Users,
+    X,
+    Search,
+    Send,
+} from "lucide-react";
 
 interface Role {
     id: number;
@@ -73,15 +83,29 @@ const Projects = () => {
     const [selectedRole, setSelectedRole] = useState<number | null>(null);
     const [joinMessage, setJoinMessage] = useState("");
 
+    // Add member modal state
+    const [showAddMemberModal, setShowAddMemberModal] = useState<string | null>(
+        null
+    );
+    const [userSearchQuery, setUserSearchQuery] = useState("");
+    const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
+    const [selectedUserToAdd, setSelectedUserToAdd] = useState<any | null>(null);
+    const [addMemberRoleId, setAddMemberRoleId] = useState<number | null>(null);
+
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const currentUserId = user.id;
+
+    const [friends, setFriends] = useState<any[]>([]);
 
     const fetchProjects = async () => {
         try {
             const token = localStorage.getItem("token");
-            const { data } = await axios.get("http://localhost:4000/api/projects", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const { data } = await axios.get(
+                "http://localhost:4000/api/projects",
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             setProjects(data);
         } catch (error) {
             console.error("Error fetching projects:", error);
@@ -91,31 +115,51 @@ const Projects = () => {
     const fetchRoles = async () => {
         try {
             const token = localStorage.getItem("token");
-            const { data } = await axios.get("http://localhost:4000/api/projects/roles", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const { data } = await axios.get(
+                "http://localhost:4000/api/projects/roles",
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             setRoles(data);
         } catch (error) {
             console.error("Error fetching roles:", error);
         }
     };
 
+    const fetchFriends = async () => {
+        try {
+            const token = localStorage.getItem("token");
+            const { data } = await axios.get("http://localhost:4000/api/friends", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setFriends(data);
+        } catch (error) {
+            console.error("Error fetching friends:", error);
+        }
+    };
+
     useEffect(() => {
         fetchProjects();
         fetchRoles();
+        fetchFriends();
     }, []);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             const token = localStorage.getItem("token");
-            await axios.post("http://localhost:4000/api/projects", {
-                ...newProject,
-                isTeam,
-                roleRequirements: isTeam ? selectedRoles : []
-            }, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await axios.post(
+                "http://localhost:4000/api/projects",
+                {
+                    ...newProject,
+                    isTeam,
+                    roleRequirements: isTeam ? selectedRoles : [],
+                },
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             setShowCreate(false);
             setIsTeam(false);
             setSelectedRoles([]);
@@ -140,9 +184,12 @@ const Projects = () => {
 
         try {
             const token = localStorage.getItem("token");
-            await axios.delete(`http://localhost:4000/api/projects/${projectId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await axios.delete(
+                `http://localhost:4000/api/projects/${projectId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             fetchProjects();
         } catch (error) {
             console.error("Error deleting project:", error);
@@ -178,33 +225,41 @@ const Projects = () => {
     };
 
     const addRole = (roleId: number) => {
-        if (!selectedRoles.find(r => r.roleId === roleId)) {
+        if (!selectedRoles.find((r) => r.roleId === roleId)) {
             setSelectedRoles([...selectedRoles, { roleId, count: 1 }]);
         }
         setRoleSearch("");
     };
 
     const removeRole = (roleId: number) => {
-        setSelectedRoles(selectedRoles.filter(r => r.roleId !== roleId));
+        setSelectedRoles(selectedRoles.filter((r) => r.roleId !== roleId));
     };
 
     const updateRoleCount = (roleId: number, delta: number) => {
-        setSelectedRoles(selectedRoles.map(r =>
-            r.roleId === roleId ? { ...r, count: Math.max(1, r.count + delta) } : r
-        ));
+        setSelectedRoles(
+            selectedRoles.map((r) =>
+                r.roleId === roleId
+                    ? { ...r, count: Math.max(1, r.count + delta) }
+                    : r
+            )
+        );
     };
 
-    const filteredRoles = roles.filter(role =>
-        role.name.toLowerCase().includes(roleSearch.toLowerCase()) &&
-        !selectedRoles.find(r => r.roleId === role.id)
+    const filteredRoles = roles.filter(
+        (role) =>
+            role.name.toLowerCase().includes(roleSearch.toLowerCase()) &&
+            !selectedRoles.find((r) => r.roleId === role.id)
     );
 
     const fetchComments = async (projectId: string) => {
         try {
             const token = localStorage.getItem("token");
-            const { data } = await axios.get(`http://localhost:4000/api/projects/${projectId}/comments`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const { data } = await axios.get(
+                `http://localhost:4000/api/projects/${projectId}/comments`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             setComments(data);
         } catch (error) {
             console.error("Error fetching comments:", error);
@@ -251,8 +306,76 @@ const Projects = () => {
         }
     };
 
+    // ✅ Fix: check if CURRENT USER is a member
     const isUserMember = (project: Project) => {
-        return project.members && project.members.length > 0;
+        return project.members?.some((m) => m.userId === currentUserId) ?? false;
+    };
+
+    // ✅ searchUsers: excludes owner + existing members for that project
+    const searchUsers = async (query: string) => {
+        setUserSearchQuery(query);
+
+        if (!query.trim()) {
+            setUserSearchResults([]);
+            setSelectedUserToAdd(null);
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem("token");
+            const { data } = await axios.get(
+                `http://localhost:4000/api/auth/search?q=${encodeURIComponent(query)}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
+
+            const project = projects.find((p) => p.id === showAddMemberModal);
+            const ownerIdToExclude = project?.ownerId;
+            const memberIdsToExclude = project?.members?.map((m) => m.userId) ?? [];
+
+            const filtered = data.filter(
+                (u: any) =>
+                    u.id !== ownerIdToExclude &&
+                    !memberIdsToExclude.includes(u.id)
+            );
+
+            setUserSearchResults(filtered);
+        } catch (error) {
+            console.error("Error searching users:", error);
+        }
+    };
+
+    const handleAddMember = async (projectId: string) => {
+        if (!selectedUserToAdd) {
+            alert("Please select a user to add");
+            return;
+        }
+        if (!addMemberRoleId) {
+            alert("Please select a role for the member");
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem("token");
+            await axios.post(
+                `http://localhost:4000/api/projects/${projectId}/members`,
+                {
+                    userId: selectedUserToAdd.id,
+                    roleId: addMemberRoleId,
+                },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            alert("Member added successfully");
+            setShowAddMemberModal(null);
+            setUserSearchQuery("");
+            setUserSearchResults([]);
+            setSelectedUserToAdd(null);
+            setAddMemberRoleId(null);
+            fetchProjects();
+        } catch (error: any) {
+            alert(error.response?.data?.error || "Error adding member");
+        }
     };
 
     return (
@@ -273,20 +396,28 @@ const Projects = () => {
                     <h3 className="text-xl font-semibold mb-4">Create New Project</h3>
                     <form onSubmit={handleCreate} className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Title *</label>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Title *
+                            </label>
                             <input
                                 type="text"
                                 value={newProject.title}
-                                onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
+                                onChange={(e) =>
+                                    setNewProject({ ...newProject, title: e.target.value })
+                                }
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">Description</label>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Description
+                            </label>
                             <textarea
                                 value={newProject.description}
-                                onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                                onChange={(e) =>
+                                    setNewProject({ ...newProject, description: e.target.value })
+                                }
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
                                 rows={3}
                             />
@@ -301,7 +432,10 @@ const Projects = () => {
                                 onChange={(e) => setIsTeam(e.target.checked)}
                                 className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                             />
-                            <label htmlFor="isTeam" className="ml-2 block text-sm text-gray-900">
+                            <label
+                                htmlFor="isTeam"
+                                className="ml-2 block text-sm text-gray-900"
+                            >
                                 Create as Team
                             </label>
                         </div>
@@ -309,7 +443,9 @@ const Projects = () => {
                         {/* Role Selection UI */}
                         {isTeam && (
                             <div className="border rounded-md p-4 bg-gray-50">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Team Role Requirements</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Team Role Requirements
+                                </label>
 
                                 {/* Role Search */}
                                 <div className="relative mb-3">
@@ -323,7 +459,7 @@ const Projects = () => {
                                     />
                                     {roleSearch && filteredRoles.length > 0 && (
                                         <div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                                            {filteredRoles.map(role => (
+                                            {filteredRoles.map((role) => (
                                                 <div
                                                     key={role.id}
                                                     onClick={() => addRole(role.id)}
@@ -338,11 +474,16 @@ const Projects = () => {
 
                                 {/* Selected Roles */}
                                 <div className="space-y-2">
-                                    {selectedRoles.map(roleReq => {
-                                        const role = roles.find(r => r.id === roleReq.roleId);
+                                    {selectedRoles.map((roleReq) => {
+                                        const role = roles.find((r) => r.id === roleReq.roleId);
                                         return (
-                                            <div key={roleReq.roleId} className="flex items-center justify-between bg-white p-2 rounded border">
-                                                <span className="text-sm font-medium">{role?.name}</span>
+                                            <div
+                                                key={roleReq.roleId}
+                                                className="flex items-center justify-between bg-white p-2 rounded border"
+                                            >
+                                                <span className="text-sm font-medium">
+                                                    {role?.name}
+                                                </span>
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         type="button"
@@ -351,7 +492,9 @@ const Projects = () => {
                                                     >
                                                         -
                                                     </button>
-                                                    <span className="w-8 text-center">{roleReq.count}</span>
+                                                    <span className="w-8 text-center">
+                                                        {roleReq.count}
+                                                    </span>
                                                     <button
                                                         type="button"
                                                         onClick={() => updateRoleCount(roleReq.roleId, 1)}
@@ -371,7 +514,9 @@ const Projects = () => {
                                         );
                                     })}
                                     {selectedRoles.length === 0 && (
-                                        <p className="text-sm text-gray-500 text-center py-2">No roles added yet. Search and add roles above.</p>
+                                        <p className="text-sm text-gray-500 text-center py-2">
+                                            No roles added yet. Search and add roles above.
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -379,10 +524,14 @@ const Projects = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Status</label>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Status
+                                </label>
                                 <select
                                     value={newProject.status}
-                                    onChange={(e) => setNewProject({ ...newProject, status: e.target.value })}
+                                    onChange={(e) =>
+                                        setNewProject({ ...newProject, status: e.target.value })
+                                    }
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
                                 >
                                     <option value="OPEN">Just Started</option>
@@ -393,31 +542,43 @@ const Projects = () => {
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Git Repository URL</label>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Git Repository URL
+                                </label>
                                 <input
                                     type="url"
                                     value={newProject.gitUrl}
-                                    onChange={(e) => setNewProject({ ...newProject, gitUrl: e.target.value })}
+                                    onChange={(e) =>
+                                        setNewProject({ ...newProject, gitUrl: e.target.value })
+                                    }
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
                                     placeholder="https://github.com/..."
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Video URL</label>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Video URL
+                                </label>
                                 <input
                                     type="url"
                                     value={newProject.videoUrl}
-                                    onChange={(e) => setNewProject({ ...newProject, videoUrl: e.target.value })}
+                                    onChange={(e) =>
+                                        setNewProject({ ...newProject, videoUrl: e.target.value })
+                                    }
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
                                     placeholder="https://youtube.com/..."
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Image URL</label>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Image URL
+                                </label>
                                 <input
                                     type="url"
                                     value={newProject.imageUrl}
-                                    onChange={(e) => setNewProject({ ...newProject, imageUrl: e.target.value })}
+                                    onChange={(e) =>
+                                        setNewProject({ ...newProject, imageUrl: e.target.value })
+                                    }
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
                                     placeholder="https://..."
                                 />
@@ -449,17 +610,23 @@ const Projects = () => {
             {/* Projects List */}
             <div className="grid grid-cols-1 gap-6">
                 {projects.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No projects yet. Create one!</p>
+                    <p className="text-gray-500 text-center py-8">
+                        No projects yet. Create one!
+                    </p>
                 ) : (
                     projects.map((project) => (
                         <div key={project.id} className="bg-white p-6 rounded-lg shadow-md">
                             {/* Person name with connection button */}
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                    <h4 className="text-lg font-semibold text-gray-800">{project.owner.displayName}</h4>
-                                    {project.ownerId !== currentUserId && (
+                                    <h4 className="text-lg font-semibold text-gray-800">
+                                        {project.owner.displayName}
+                                    </h4>
+                                    {project.ownerId !== currentUserId && !friends.some(f => f.id === project.ownerId) && (
                                         <button
-                                            onClick={() => handleSendFriendRequest(project.owner.id)}
+                                            onClick={() =>
+                                                handleSendFriendRequest(project.owner.id)
+                                            }
                                             className="bg-blue-600 text-white px-3 py-1 rounded-md flex items-center hover:bg-blue-700 text-sm"
                                         >
                                             <UserPlus className="w-4 h-4 mr-1" />
@@ -468,21 +635,36 @@ const Projects = () => {
                                     )}
                                 </div>
                                 {project.ownerId === currentUserId && (
-                                    <button
-                                        onClick={() => handleDelete(project.id)}
-                                        className="bg-red-600 text-white px-3 py-1 rounded-md flex items-center hover:bg-red-700 text-sm"
-                                    >
-                                        <Trash2 className="w-4 h-4 mr-1" />
-                                        Delete
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() =>
+                                                setShowAddMemberModal(project.id)
+                                            }
+                                            className="bg-green-600 text-white px-3 py-1 rounded-md flex items-center hover:bg-green-700 text-sm"
+                                        >
+                                            <Users className="w-4 h-4 mr-1" />
+                                            Add Member
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(project.id)}
+                                            className="bg-red-600 text-white px-3 py-1 rounded-md flex items-center hover:bg-red-700 text-sm"
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-1" />
+                                            Delete
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
                             {/* Role below person name */}
-                            <p className="text-sm text-gray-500 mb-2">{project.owner.role}</p>
+                            <p className="text-sm text-gray-500 mb-2">
+                                {project.owner.role}
+                            </p>
 
                             {/* Project title */}
-                            <h3 className="text-xl font-bold text-blue-600 mb-2">{project.title}</h3>
+                            <h3 className="text-xl font-bold text-blue-600 mb-2">
+                                {project.title}
+                            </h3>
 
                             {/* Description */}
                             <p className="text-gray-700 mb-4">{project.description}</p>
@@ -499,18 +681,30 @@ const Projects = () => {
                             )}
 
                             {/* Role Requirements if team */}
-                            {project.isTeam && project.roleRequirements && project.roleRequirements.reduce((acc, req) => acc + req.count, 0) > 0 && (
-                                <div className="mb-4 p-3 bg-gray-50 rounded-md">
-                                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Team Requirements:</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {project.roleRequirements.filter(req => req.count > 0).map(req => (
-                                            <span key={req.id} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                                                {req.role.name} ({req.count})
-                                            </span>
-                                        ))}
+                            {project.isTeam &&
+                                project.roleRequirements &&
+                                project.roleRequirements.reduce(
+                                    (acc, req) => acc + req.count,
+                                    0
+                                ) > 0 && (
+                                    <div className="mb-4 p-3 bg-gray-50 rounded-md">
+                                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                                            Team Requirements:
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {project.roleRequirements
+                                                .filter((req) => req.count > 0)
+                                                .map((req) => (
+                                                    <span
+                                                        key={req.id}
+                                                        className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                                                    >
+                                                        {req.role.name} ({req.count})
+                                                    </span>
+                                                ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
                             {/* Horizontal layout: comments, github link, video link */}
                             <div className="flex items-center gap-6 pt-4 border-t">
@@ -528,7 +722,9 @@ const Projects = () => {
                                     className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
                                 >
                                     <MessageCircle className="w-5 h-5" />
-                                    <span className="text-sm">{project._count?.comments || 0} comments</span>
+                                    <span className="text-sm">
+                                        {project._count?.comments || 0} comments
+                                    </span>
                                 </button>
 
                                 {/* Upvotes */}
@@ -537,7 +733,9 @@ const Projects = () => {
                                     className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
                                 >
                                     <ThumbsUp className="w-5 h-5" />
-                                    <span className="text-sm">{project._count?.upvotes || 0}</span>
+                                    <span className="text-sm">
+                                        {project._count?.upvotes || 0}
+                                    </span>
                                 </button>
 
                                 {/* GitHub link with logo */}
@@ -548,7 +746,11 @@ const Projects = () => {
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
                                     >
-                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                        <svg
+                                            className="w-5 h-5"
+                                            fill="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
                                             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                                         </svg>
                                         <span className="text-sm">GitHub</span>
@@ -563,7 +765,11 @@ const Projects = () => {
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors"
                                     >
-                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                        <svg
+                                            className="w-5 h-5"
+                                            fill="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
                                             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                                         </svg>
                                         <span className="text-sm">Video</span>
@@ -575,13 +781,16 @@ const Projects = () => {
                                     <div className="ml-auto">
                                         {isUserMember(project) ? (
                                             <button
-                                                onClick={() => navigate(`/network/teams?teamId=${project.id}`)}
+                                                onClick={() =>
+                                                    navigate(`/network/teams?teamId=${project.id}`)
+                                                }
                                                 className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm"
                                             >
                                                 <Users className="w-4 h-4" />
                                                 View Team
                                             </button>
-                                        ) : project.joinRequests && project.joinRequests.length > 0 ? (
+                                        ) : project.joinRequests &&
+                                            project.joinRequests.length > 0 ? (
                                             <button
                                                 disabled
                                                 className="flex items-center gap-2 bg-yellow-500 text-white px-4 py-2 rounded-md cursor-not-allowed text-sm"
@@ -607,17 +816,28 @@ const Projects = () => {
                                 <div className="mt-4 border-t pt-4">
                                     <div className="space-y-3 mb-4">
                                         {comments.length === 0 ? (
-                                            <p className="text-gray-500 text-sm">No comments yet.</p>
+                                            <p className="text-gray-500 text-sm">
+                                                No comments yet.
+                                            </p>
                                         ) : (
-                                            comments.map(comment => (
-                                                <div key={comment.id} className="bg-gray-50 p-3 rounded">
+                                            comments.map((comment) => (
+                                                <div
+                                                    key={comment.id}
+                                                    className="bg-gray-50 p-3 rounded"
+                                                >
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className="font-semibold text-sm">{comment.user.displayName}</span>
+                                                        <span className="font-semibold text-sm">
+                                                            {comment.user.displayName}
+                                                        </span>
                                                         <span className="text-xs text-gray-500">
-                                                            {new Date(comment.createdAt).toLocaleString()}
+                                                            {new Date(
+                                                                comment.createdAt
+                                                            ).toLocaleString()}
                                                         </span>
                                                     </div>
-                                                    <p className="text-gray-700 text-sm">{comment.content}</p>
+                                                    <p className="text-gray-700 text-sm">
+                                                        {comment.content}
+                                                    </p>
                                                 </div>
                                             ))
                                         )}
@@ -629,7 +849,9 @@ const Projects = () => {
                                             onChange={(e) => setNewComment(e.target.value)}
                                             placeholder="Write a comment..."
                                             className="flex-1 rounded-md border-gray-300 shadow-sm border p-2 text-sm"
-                                            onKeyPress={(e) => e.key === 'Enter' && handleAddComment(project.id)}
+                                            onKeyPress={(e) =>
+                                                e.key === "Enter" && handleAddComment(project.id)
+                                            }
                                         />
                                         <button
                                             onClick={() => handleAddComment(project.id)}
@@ -652,31 +874,44 @@ const Projects = () => {
                     <div className="bg-white rounded-lg p-6 max-w-md w-full">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-semibold">Join Team</h3>
-                            <button onClick={() => setShowJoinModal(null)} className="text-gray-500 hover:text-gray-700">
+                            <button
+                                onClick={() => setShowJoinModal(null)}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Select Role</label>
-                                {projects.find(p => p.id === showJoinModal)?.roleRequirements?.map(req => (
-                                    <div
-                                        key={req.id}
-                                        onClick={() => setSelectedRole(req.roleId)}
-                                        className={`p-3 border rounded-md cursor-pointer mb-2 ${selectedRole === req.roleId ? 'border-blue-600 bg-blue-50' : 'hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-medium">{req.role.name}</span>
-                                            <span className="text-sm text-gray-600">{req.count} needed</span>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Role
+                                </label>
+                                {projects
+                                    .find((p) => p.id === showJoinModal)
+                                    ?.roleRequirements?.map((req) => (
+                                        <div
+                                            key={req.id}
+                                            onClick={() => setSelectedRole(req.roleId)}
+                                            className={`p-3 border rounded-md cursor-pointer mb-2 ${selectedRole === req.roleId
+                                                ? "border-blue-600 bg-blue-50"
+                                                : "hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-medium">{req.role.name}</span>
+                                                <span className="text-sm text-gray-600">
+                                                    {req.count} needed
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Message (Optional)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Message (Optional)
+                                </label>
                                 <textarea
                                     value={joinMessage}
                                     onChange={(e) => setJoinMessage(e.target.value)}
@@ -691,6 +926,111 @@ const Projects = () => {
                                 className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
                             >
                                 Send Request
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Member Modal (Owner Only) */}
+            {showAddMemberModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold">
+                                Add Member to Team
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowAddMemberModal(null);
+                                    setUserSearchQuery("");
+                                    setUserSearchResults([]);
+                                    setSelectedUserToAdd(null);
+                                    setAddMemberRoleId(null);
+                                }}
+                                className="text-gray-500 hover:text-gray-700"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Role Select for new member */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Select Role for Member
+                                </label>
+                                <select
+                                    value={addMemberRoleId ?? ""}
+                                    onChange={(e) =>
+                                        setAddMemberRoleId(
+                                            e.target.value ? Number(e.target.value) : null
+                                        )
+                                    }
+                                    className="w-full border rounded-md px-3 py-2"
+                                >
+                                    <option value="">Select a role</option>
+                                    {projects
+                                        .find((p) => p.id === showAddMemberModal)
+                                        ?.roleRequirements?.map((req) => (
+                                            <option key={req.id} value={req.roleId}>
+                                                {req.role.name} ({req.count} remaining)
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
+
+                            {/* User Search */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Search User
+                                </label>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Type a name or email..."
+                                        value={userSearchQuery}
+                                        onChange={(e) => searchUsers(e.target.value)}
+                                        className="pl-10 w-full rounded-md border-gray-300 shadow-sm border p-2"
+                                    />
+                                </div>
+                                {userSearchQuery && (
+                                    <div className="mt-2 max-h-48 overflow-y-auto border rounded-md">
+                                        {userSearchResults.length === 0 ? (
+                                            <p className="text-sm text-gray-500 p-2">
+                                                No users found.
+                                            </p>
+                                        ) : (
+                                            userSearchResults.map((u) => (
+                                                <div
+                                                    key={u.id}
+                                                    onClick={() => setSelectedUserToAdd(u)}
+                                                    className={`px-4 py-2 cursor-pointer ${selectedUserToAdd?.id === u.id
+                                                        ? "bg-blue-50"
+                                                        : "hover:bg-gray-50"
+                                                        }`}
+                                                >
+                                                    <div className="font-medium text-sm">
+                                                        {u.displayName || u.name || u.email}
+                                                    </div>
+                                                    {u.email && (
+                                                        <div className="text-xs text-gray-500">
+                                                            {u.email}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={() => handleAddMember(showAddMemberModal)}
+                                className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                            >
+                                Add Member
                             </button>
                         </div>
                     </div>
