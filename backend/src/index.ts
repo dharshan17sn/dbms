@@ -1,9 +1,17 @@
-import app from "./app";
 import config from "./config";
+import app from "./app";
 import prisma from "./db/prismaClient";
+import { startJobCleanup } from "./jobs/cleanup";
+import { seedRoles } from "./utils/seeder";
 
 async function main() {
   await prisma.$connect();
+
+  // Seed roles on startup
+  await seedRoles();
+
+  // Start cron jobs
+  startJobCleanup();
 
   app.listen(config.port, () => {
     const baseUrl = `http://localhost:${config.port}`;
@@ -15,7 +23,6 @@ async function main() {
     console.log("✨ Press Ctrl+Click on any URL above to open it in your browser.\n");
   });
 }
-
 main().catch((err) => {
   console.error("Fatal error:", err);
   process.exit(1);

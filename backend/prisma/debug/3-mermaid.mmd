@@ -1,0 +1,315 @@
+erDiagram
+
+        UserRole {
+            STUDENT STUDENT
+MENTOR MENTOR
+PLACEMENT_ADMIN PLACEMENT_ADMIN
+ADMIN ADMIN
+        }
+    
+
+
+        ProjectType {
+            IDEA IDEA
+EXPERIMENTAL EXPERIMENTAL
+STARTUP_DISCUSSION STARTUP_DISCUSSION
+        }
+    
+
+
+        Visibility {
+            PUBLIC PUBLIC
+COLLEGE_ONLY COLLEGE_ONLY
+PRIVATE PRIVATE
+        }
+    
+
+
+        ProjectStatus {
+            OPEN OPEN
+FORMING FORMING
+ACTIVE ACTIVE
+COMPLETED COMPLETED
+ARCHIVED ARCHIVED
+        }
+    
+
+
+        JoinRequestStatus {
+            PENDING PENDING
+ACCEPTED ACCEPTED
+REJECTED REJECTED
+CANCELLED CANCELLED
+        }
+    
+
+
+        FileType {
+            GIT GIT
+VIDEO VIDEO
+IMAGE IMAGE
+DOC DOC
+OTHER OTHER
+        }
+    
+
+
+        VerificationStatus {
+            REQUESTED REQUESTED
+SCHEDULED SCHEDULED
+VERIFIED VERIFIED
+REJECTED REJECTED
+        }
+    
+
+
+        AppliedVia {
+            MANUAL MANUAL
+AUTO AUTO
+        }
+    
+
+
+        ApplicationStatus {
+            APPLIED APPLIED
+SHORTLISTED SHORTLISTED
+REJECTED REJECTED
+HIRED HIRED
+        }
+    
+
+
+        TaskStatus {
+            TODO TODO
+IN_PROGRESS IN_PROGRESS
+DONE DONE
+        }
+    
+
+
+        ChatType {
+            PROJECT PROJECT
+IDEA IDEA
+        }
+    
+  "User" {
+    String id "🗝️"
+    String email 
+    String passwordHash 
+    String displayName 
+    UserRole role 
+    DateTime createdAt 
+    DateTime lastSeen "❓"
+    }
+  
+
+  "Profile" {
+    Decimal tenthPercent "❓"
+    Decimal twelfthPercent "❓"
+    Decimal cgpa "❓"
+    String resumeLink "❓"
+    String skills 
+    String bio "❓"
+    Boolean allowAutoApply 
+    DateTime createdAt 
+    }
+  
+
+  "Project" {
+    String id "🗝️"
+    String title 
+    String description "❓"
+    ProjectType type 
+    Visibility visibility 
+    DateTime createdAt 
+    DateTime updatedAt 
+    ProjectStatus status 
+    Int trustScore 
+    }
+  
+
+  "Role" {
+    Int id "🗝️"
+    String name 
+    }
+  
+
+  "ProjectMember" {
+    Boolean isOwner 
+    DateTime joinedAt 
+    }
+  
+
+  "JoinRequest" {
+    String id "🗝️"
+    String message "❓"
+    JoinRequestStatus status 
+    DateTime createdAt 
+    DateTime processedAt "❓"
+    }
+  
+
+  "ProjectFile" {
+    String id "🗝️"
+    FileType fileType 
+    String url 
+    String caption "❓"
+    DateTime uploadedAt 
+    }
+  
+
+  "Verification" {
+    String id "🗝️"
+    VerificationStatus status 
+    DateTime requestedAt 
+    DateTime scheduledAt "❓"
+    DateTime verifiedAt "❓"
+    String notes "❓"
+    }
+  
+
+  "MentorshipPresentation" {
+    String id "🗝️"
+    DateTime scheduledAt 
+    String location "❓"
+    String meetingLink "❓"
+    DateTime createdAt 
+    }
+  
+
+  "Company" {
+    String id "🗝️"
+    String name 
+    String website "❓"
+    DateTime createdAt 
+    }
+  
+
+  "JobPost" {
+    String id "🗝️"
+    String title 
+    String description "❓"
+    String jdLink "❓"
+    Decimal minCgpa "❓"
+    Boolean requiresVerifiedProject 
+    DateTime postedAt 
+    DateTime expiresAt "❓"
+    }
+  
+
+  "JobApplication" {
+    String id "🗝️"
+    DateTime appliedAt 
+    AppliedVia appliedVia 
+    ApplicationStatus status 
+    }
+  
+
+  "AutoApplyRule" {
+    Decimal minCgpa "❓"
+    Boolean requireVerifiedProject 
+    String skills 
+    DateTime lastCheckedAt "❓"
+    }
+  
+
+  "Notification" {
+    String id "🗝️"
+    String type 
+    Json payload 
+    Boolean read 
+    DateTime createdAt 
+    }
+  
+
+  "Task" {
+    String id "🗝️"
+    String title 
+    String description "❓"
+    TaskStatus status 
+    Int priority 
+    DateTime createdAt 
+    DateTime dueDate "❓"
+    }
+  
+
+  "ActivityLog" {
+    String id "🗝️"
+    String action 
+    Json meta "❓"
+    DateTime createdAt 
+    }
+  
+
+  "Message" {
+    String id "🗝️"
+    String content 
+    ChatType type 
+    DateTime createdAt 
+    }
+  
+    "User" o|--|| "UserRole" : "enum:role"
+    "User" o{--}o "Profile" : ""
+    "User" o{--}o "Project" : ""
+    "User" o{--}o "ProjectMember" : ""
+    "User" o{--}o "JoinRequest" : ""
+    "User" o{--}o "JoinRequest" : ""
+    "User" o{--}o "ProjectFile" : ""
+    "User" o{--}o "Verification" : ""
+    "User" o{--}o "Verification" : ""
+    "User" o{--}o "MentorshipPresentation" : ""
+    "User" o{--}o "Company" : ""
+    "User" o{--}o "JobApplication" : ""
+    "User" o{--}o "AutoApplyRule" : ""
+    "User" o{--}o "Notification" : ""
+    "User" o{--}o "Task" : ""
+    "User" o{--}o "ActivityLog" : ""
+    "User" o{--}o "Message" : ""
+    "Profile" o|--|| "User" : "user"
+    "Project" o|--|| "User" : "owner"
+    "Project" o|--|| "ProjectType" : "enum:type"
+    "Project" o|--|| "Visibility" : "enum:visibility"
+    "Project" o|--|| "ProjectStatus" : "enum:status"
+    "Project" o{--}o "ProjectMember" : ""
+    "Project" o{--}o "JoinRequest" : ""
+    "Project" o{--}o "ProjectFile" : ""
+    "Project" o{--}o "Verification" : ""
+    "Project" o{--}o "Task" : ""
+    "Project" o{--}o "ActivityLog" : ""
+    "Project" o{--}o "Message" : ""
+    "Role" o{--}o "ProjectMember" : ""
+    "ProjectMember" o|--|| "Project" : "project"
+    "ProjectMember" o|--|| "User" : "user"
+    "ProjectMember" o|--|o "Role" : "role"
+    "JoinRequest" o|--|| "JoinRequestStatus" : "enum:status"
+    "JoinRequest" o|--|| "Project" : "project"
+    "JoinRequest" o|--|| "User" : "requester"
+    "JoinRequest" o|--|o "User" : "processor"
+    "ProjectFile" o|--|| "FileType" : "enum:fileType"
+    "ProjectFile" o|--|| "Project" : "project"
+    "ProjectFile" o|--|o "User" : "uploader"
+    "Verification" o|--|| "VerificationStatus" : "enum:status"
+    "Verification" o|--|| "Project" : "project"
+    "Verification" o|--|| "User" : "requester"
+    "Verification" o|--|o "User" : "mentor"
+    "Verification" o{--}o "MentorshipPresentation" : ""
+    "MentorshipPresentation" o|--|| "Verification" : "verification"
+    "MentorshipPresentation" o|--|o "User" : "mentor"
+    "Company" o|--|o "User" : "creator"
+    "Company" o{--}o "JobPost" : ""
+    "JobPost" o|--|o "Company" : "company"
+    "JobPost" o{--}o "JobApplication" : ""
+    "JobApplication" o|--|| "AppliedVia" : "enum:appliedVia"
+    "JobApplication" o|--|| "ApplicationStatus" : "enum:status"
+    "JobApplication" o|--|| "JobPost" : "jobPost"
+    "JobApplication" o|--|| "User" : "applicant"
+    "AutoApplyRule" o|--|| "User" : "user"
+    "Notification" o|--|| "User" : "user"
+    "Task" o|--|| "TaskStatus" : "enum:status"
+    "Task" o|--|| "Project" : "project"
+    "Task" o|--|o "User" : "assignee"
+    "ActivityLog" o|--|o "Project" : "project"
+    "ActivityLog" o|--|o "User" : "user"
+    "Message" o|--|| "ChatType" : "enum:type"
+    "Message" o|--|| "User" : "sender"
+    "Message" o|--|o "Project" : "project"

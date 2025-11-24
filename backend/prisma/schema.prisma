@@ -4,10 +4,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 
 enum UserRole {
   STUDENT
@@ -99,6 +101,13 @@ model User {
   notifications          Notification[]
   tasksAssigned          Task[]            @relation("TaskAssignee")
   activityLogs           ActivityLog[]
+  messagesSent           Message[]
+  sentFriendRequests     Friendship[]      @relation("SentFriendRequests")
+  receivedFriendRequests Friendship[]      @relation("ReceivedFriendRequests")
+  projectComments        ProjectComment[]
+  projectUpvotes         ProjectUpvote[]
+  ideas                  Idea[]
+  ideaComments           IdeaComment[]
 }
 
 model Profile {
@@ -110,6 +119,7 @@ model Profile {
   resumeLink     String?
   skills         String[] // Postgres array
   bio            String?
+  researchPapers String[] @default([]) // For mentors
   allowAutoApply Boolean  @default(false)
   createdAt      DateTime @default(now())
 }
@@ -126,18 +136,29 @@ model Project {
   updatedAt    DateTime         @updatedAt
   status       ProjectStatus    @default(OPEN)
   trustScore   Int              @default(0)
+  videoUrl     String?
+  imageUrl     String?
+  gitUrl       String?
+  isTeam       Boolean          @default(false)
+  teamOpenings Int              @default(0)
   members      ProjectMember[]
   joinRequests JoinRequest[]
   files        ProjectFile[]
   verifications Verification[]
   tasks        Task[]
   activityLogs ActivityLog[]
+  messages     Message[]
+  comments     ProjectComment[]
+  upvotes      ProjectUpvote[]
+  roleRequirements TeamRoleRequirement[]
 }
 
 model Role {
   id      Int             @id @default(autoincrement())
   name    String          @unique
   members ProjectMember[]
+  joinRequests JoinRequest[] @relation("RequestedRole")
+  roleRequirements TeamRoleRequirement[]
 }
 
 model ProjectMember {
@@ -159,6 +180,7 @@ model JoinRequest {
   id          String          @id @default(uuid()) @db.Uuid
   projectId   String          @db.Uuid
   requesterId String          @db.Uuid
+  requestedRoleId Int?
   message     String?
   status      JoinRequestStatus @default(PENDING)
   createdAt   DateTime        @default(now())
@@ -168,6 +190,7 @@ model JoinRequest {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   requester User    @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
   processor User?   @relation("Processor", fields: [processedBy], references: [id])
+  requestedRole Role? @relation("RequestedRole", fields: [requestedRoleId], references: [id])
 }
 
 model ProjectFile {
@@ -230,6 +253,7 @@ model JobPost {
   title                   String
   description             String?
   jdLink                  String?
+  jdFile                  String? // File path for uploaded JD
   minCgpa                 Decimal?    @db.Decimal(4, 2)
   requiresVerifiedProject Boolean     @default(false)
   postedAt                DateTime    @default(now())
@@ -306,4 +330,107 @@ model ActivityLog {
 
   @@index([projectId])
   @@index([userId])
+}
+
+enum ChatType {
+  PROJECT
+  IDEA
+}
+
+model Message {
+  id        String   @id @default(uuid()) @db.Uuid
+  content   String
+  senderId  String   @db.Uuid
+  type      ChatType @default(IDEA)
+  projectId String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  sender  User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([senderId])
+  @@index([projectId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Friendship {
+  id          String           @id @default(uuid()) @db.Uuid
+  requesterId String           @db.Uuid
+  receiverId  String           @db.Uuid
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+
+  requester User @relation("SentFriendRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver  User @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, receiverId])
+}
+
+model ProjectComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  userId    String   @db.Uuid
+  content   String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ProjectUpvote {
+  projectId String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Idea {
+  id          String        @id @default(uuid()) @db.Uuid
+  title       String
+  description String
+  userId      String        @db.Uuid
+  createdAt   DateTime      @default(now())
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments IdeaComment[]
+
+  @@index([userId])
+}
+
+model IdeaComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  ideaId    String   @db.Uuid
+  userId    String   @db.Uuid
+  content   String
+  createdAt DateTime @default(now())
+
+  idea Idea @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ideaId])
+}
+
+model TeamRoleRequirement {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  roleId    Int
+  count     Int      @default(1)
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  @@unique([projectId, roleId])
+  @@index([projectId])
 }
