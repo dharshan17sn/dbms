@@ -111,4 +111,42 @@ router.post("/:id/comments", async (req, res) => {
     }
 });
 
+// Delete idea
+router.delete("/:id", async (req, res) => {
+    // @ts-ignore
+    const userId = req.user?.userId;
+    const { id } = req.params;
+
+    if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+    }
+
+    try {
+        const idea = await prisma.idea.findUnique({
+            where: { id },
+            select: { userId: true }
+        });
+
+        if (!idea) {
+            res.status(404).json({ error: "Idea not found" });
+            return;
+        }
+
+        if (idea.userId !== userId) {
+            res.status(403).json({ error: "You can only delete your own ideas" });
+            return;
+        }
+
+        await prisma.idea.delete({
+            where: { id }
+        });
+
+        res.json({ message: "Idea deleted successfully" });
+    } catch (error) {
+        console.error("Delete idea error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
 export default router;
